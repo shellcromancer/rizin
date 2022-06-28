@@ -3,6 +3,7 @@
 
 #include <rz_util.h>
 #include <zlib.h>
+#include <lzma.h>
 
 // set a maximum output buffer of 50MB
 #define MAXOUT 50000000
@@ -338,4 +339,92 @@ return_goto:
 	free(dst_tmpbuf);
 
 	return ret;
+}
+
+static bool lzma_action_buf(RZ_NONNULL RzBuffer *src, RZ_NONNULL RzBuffer *dst, ut64 block_size, ut8 *src_consumed, bool encode) {
+	bool res = true;
+	lzma_stream strm = LZMA_STREAM_INIT;
+	lzma_ret ret;
+	if (encode) {
+		lzma_filter filters[] = {
+			{ .id = LZMA_FILTER_LZMA2, .options = NULL },
+			{ .id = LZMA_VLI_UNKNOWN },
+		};
+		ret = lzma_stream_encoder(&strm, filters, LZMA_CHECK_CRC64);
+	} else {
+		ret = lzma_stream_decoder(&strm, UINT64_MAX, 0);
+	}
+	if (ret != LZMA_OK) {
+		res = false;
+		goto strm_exit;
+	}
+
+	lzma_action action = LZMA_RUN;
+
+	ut8 *inbuf = RZ_NEWS(ut8, block_size);
+	ut8 *outbuf = RZ_NEWS(ut8, block_size);
+	ut64 src_cursor = 0;
+	ut64 src_readlen = 0;
+
+	strm.next_in = NULL;
+	strm.avail_in = 0;
+	strm.next_out = outbuf;
+	strm.avail_out = sizeof(outbuf);
+
+	while ((src_readlen = rz_buf_read_at(src, src_cursor, inbuf, block_size)) > 0) {
+		src_cursor += src_readlen;
+
+		strm.avail_in = src_readlen;
+		strm.next_in = inbuf;
+		strm.next_out = outbuf;
+		strm.avail_out = block_size;
+		strm.total_out = 0;
+
+		if (src_readlen < block_size) {
+			action = LZMA_FINISH;
+		}
+		lzma_ret ret = lzma_code(&strm, action);
+		if (ret != LZMA_OK) {
+			ret = false;
+			goto buf_exit;
+		}
+
+		rz_buf_write(dst, outbuf, strm.total_out);
+	}
+
+	if (src_consumed) {
+		*src_consumed = src_cursor;
+	}
+
+buf_exit:
+	free(inbuf);
+	free(outbuf);
+strm_exit:
+	lzma_end(&strm);
+
+	return res;
+}
+
+/**
+ * \brief Decompress the \p src buffer with LZMA algorithm and put the decompressed data in \p dst
+ *
+ * \param src Where to read the compressed data from
+ * \param dst Where to write the decompressed data to
+ * \param block_size Decompression can happen block after block. Specify the size of the block here.
+ * \return true if decompression was successful, false otherwise
+ */
+RZ_API bool rz_lzma_dec_buf(RZ_NONNULL RzBuffer *src, RZ_NONNULL RzBuffer *dst, ut64 block_size, ut8 *src_consumed) {
+	return lzma_action_buf(src, dst, block_size, src_consumed, false);
+}
+
+/**
+ * \brief Compress the \p src buffer with LZMA algorithm and put the compressed data in \p dst
+ *
+ * \param src Where to read the decompressed data from
+ * \param dst Where to write the compressed data to
+ * \param block_size Compression can happen block after block. Specify the size of the block here.
+ * \return true if compression was successful, false otherwise
+ */
+RZ_API bool rz_lzma_enc_buf(RZ_NONNULL RzBuffer *src, RZ_NONNULL RzBuffer *dst, ut64 block_size, ut8 *src_consumed) {
+	return lzma_action_buf(src, dst, block_size, src_consumed, true);
 }

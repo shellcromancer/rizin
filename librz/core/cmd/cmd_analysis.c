@@ -2563,86 +2563,12 @@ RZ_IPI void rz_core_agraph_print_write(RzCore *core, const char *filename) {
 	convert_dotcmd_to_image(core, "aggd", filename);
 }
 
-static void cmd_agraph_node(RzCore *core, const char *input) {
-	switch (*input) {
-	case ' ': { // "agn"
-		int n_args = 0;
-		char **args = rz_str_argv(input, &n_args);
-		if (n_args < 1 || n_args > 3) {
-			rz_cons_printf("Wrong arguments\n");
-			rz_str_argv_free(args);
-			break;
-		}
-		const char *title = args[0];
-		const char *body = n_args > 1 ? args[1] : "";
-		int color = n_args > 2 ? atoi(args[2]) : -1;
-		rz_core_agraph_add_node(core, title, body, color);
-		rz_str_argv_free(args);
-		break;
-	}
-	case '-': { // "agn-"
-		char **args;
-		int n_args;
-
-		input++;
-		args = rz_str_argv(input, &n_args);
-		if (n_args != 1) {
-			rz_cons_printf("Wrong arguments\n");
-			rz_str_argv_free(args);
-			break;
-		}
-		rz_core_agraph_del_node(core, args[0]);
-		rz_str_argv_free(args);
-		break;
-	}
-	case '?': // "agn?"
-	default:
-		rz_core_cmd_help(core, help_msg_agn);
-		break;
-	}
-}
-
-static void cmd_agraph_edge(RzCore *core, const char *input) {
-	char **args;
-	int n_args;
-
-	switch (*input) {
-	case ' ': // "age"
-		args = rz_str_argv(input + 1, &n_args);
-		if (n_args != 2) {
-			rz_cons_printf("Wrong arguments\n");
-			rz_str_argv_free(args);
-			break;
-		}
-
-		rz_core_agraph_add_edge(core, args[0], args[1]);
-		rz_str_argv_free(args);
-		break;
-	case '-': // "age-"
-		args = rz_str_argv(input + 1, &n_args);
-		if (n_args != 2) {
-			rz_cons_printf("Wrong arguments\n");
-			rz_str_argv_free(args);
-			break;
-		}
-
-		rz_core_agraph_del_edge(core, args[0], args[1]);
-		rz_str_argv_free(args);
-		break;
-	case '?': // "age?"
-	default:
-		rz_core_cmd_help(core, help_msg_age);
-		break;
-	}
-}
-
 RZ_API void rz_core_agraph_print(RzCore *core, int use_utf, const char *input) {
 	if (use_utf != -1) {
 		rz_config_set_i(core->config, "scr.utf8", use_utf);
 	}
 	switch (*input) {
 	case 0:
-		rz_core_agraph_print_ascii(core);
 		break;
 	case 't': // "aggt" - tiny graph
 		rz_core_agraph_print_tiny(core);
@@ -2854,221 +2780,15 @@ static void cmd_analysis_graph(RzCore *core, const char *input) {
 			rz_core_visual_graph(core, NULL, fcn, false);
 			break;
 		}
-		case 'v': // "agfv"
-			eprintf("\rRendering graph...\n");
-			RzAnalysisFunction *fcn = rz_analysis_get_fcn_in(core->analysis, core->offset, RZ_ANALYSIS_FCN_TYPE_ROOT);
-			if (fcn) {
-				rz_core_visual_graph(core, NULL, fcn, 1);
-			}
-			rz_cons_enable_mouse(false);
-			rz_cons_show_cursor(true);
-			break;
 		case 't': { // "agft" - tiny graph
-			int e = rz_config_get_i(core->config, "graph.edges");
-			rz_config_set_i(core->config, "graph.edges", 0);
-			RzAnalysisFunction *fcn = rz_analysis_get_fcn_in(core->analysis, core->offset, 0);
-			rz_core_visual_graph(core, NULL, fcn, 2);
-			rz_config_set_i(core->config, "graph.edges", e);
-			break;
-		}
-		case 'd': // "agfd"
-			if (input[2] == 'm') {
-				rz_core_analysis_graph(core, rz_num_math(core->num, input + 3),
-					RZ_CORE_ANALYSIS_GRAPHLINES);
-			} else {
-				rz_core_analysis_graph(core, rz_num_math(core->num, input + 2),
-					RZ_CORE_ANALYSIS_GRAPHBODY);
-			}
-			break;
-		case 'j': // "agfj"
-			rz_core_analysis_graph(core, rz_num_math(core->num, input + 2), RZ_CORE_ANALYSIS_JSON);
-			break;
-		case 'J': { // "agfJ"
-			// Honor asm.graph=false in json as well
-			RzConfigHold *hc = rz_config_hold_new(core->config);
-			rz_config_hold_i(hc, "asm.offset", NULL);
-			const bool o_graph_offset = rz_config_get_i(core->config, "graph.offset");
-			rz_config_set_i(core->config, "asm.offset", o_graph_offset);
-			rz_core_analysis_graph(core, rz_num_math(core->num, input + 2),
-				RZ_CORE_ANALYSIS_JSON | RZ_CORE_ANALYSIS_JSON_FORMAT_DISASM);
-			rz_config_hold_restore(hc);
-			rz_config_hold_free(hc);
-			break;
-		}
-		case 'g': { // "agfg"
-			RzAnalysisFunction *fcn = rz_analysis_get_fcn_in(core->analysis, core->offset, 0);
-			rz_core_print_bb_gml(core, fcn);
-			break;
-		}
-		case 'k': // "agfk"
-			rz_core_agraph_reset(core);
-			rz_core_cmdf(core, ".agf* @ %" PFMT64u "", core->offset);
-			rz_core_agraph_print_sdb(core);
-			break;
-		case '*': { // "agf*"
-			RzAnalysisFunction *fcn = rz_analysis_get_fcn_in(core->analysis, core->offset, 0);
-			rz_core_print_bb_custom(core, fcn);
-			break;
-		}
-		case 'w': { // "agfw"
-			char *cmdargs = rz_str_newf("agfd @ 0x%" PFMT64x, core->offset);
-			convert_dotcmd_to_image(core, cmdargs, input + 2);
-			free(cmdargs);
-			break;
 		}
 		default:
 			eprintf("Usage: see ag?\n");
 			break;
 		}
-		break;
-	case '-': // "ag-"
-		rz_core_agraph_reset(core);
-		break;
-	case 'n': // "agn"
-		cmd_agraph_node(core, input + 1);
-		break;
-	case 'e': // "age"
-		cmd_agraph_edge(core, input + 1);
 		break;
 	case 'g': // "agg"
 		rz_core_agraph_print(core, -1, input + 1);
-		break;
-	case 's': // "ags"
-		rz_core_analysis_graph(core, rz_num_math(core->num, input + 1), 0);
-		break;
-	case 'C': // "agC"
-		switch (input[1]) {
-		case 'v': // "agCv"
-		case 't': // "agCt"
-		case 'k': // "agCk"
-		case 'w': // "agCw"
-		case ' ': // "agC "
-		case 0: {
-			core->graph->is_callgraph = true;
-			rz_core_agraph_reset(core);
-			rz_core_cmdf(core, ".agC*;");
-			rz_core_agraph_print(core, -1, input + 1);
-			core->graph->is_callgraph = false;
-			break;
-		}
-		case 'J': // "agCJ"
-		case 'j': // "agCj"
-			rz_core_analysis_callgraph(core, UT64_MAX, RZ_GRAPH_FORMAT_JSON);
-			break;
-		case 'g': // "agCg"
-			rz_core_analysis_callgraph(core, UT64_MAX, RZ_GRAPH_FORMAT_GML);
-			break;
-		case 'd': // "agCd"
-			rz_core_analysis_callgraph(core, UT64_MAX, RZ_GRAPH_FORMAT_DOT);
-			break;
-		case '*': // "agC*"
-			rz_core_analysis_callgraph(core, UT64_MAX, RZ_GRAPH_FORMAT_CMD);
-			break;
-		default:
-			eprintf("Usage: see ag?\n");
-			break;
-		}
-		break;
-	case 'r': // "agr" references graph
-		switch (input[1]) {
-		case '*': { // "agr*"
-			rz_core_analysis_coderefs(core, core->offset);
-		} break;
-		default: {
-			core->graph->is_callgraph = true;
-			rz_core_agraph_reset(core);
-			rz_core_cmdf(core, ".agr* @ %" PFMT64u ";", core->offset);
-			rz_core_agraph_print(core, -1, input + 1);
-			core->graph->is_callgraph = false;
-			break;
-		}
-		}
-		break;
-	case 'R': // "agR" global refs
-		switch (input[1]) {
-		case '*': { // "agR*"
-			ut64 from = rz_config_get_i(core->config, "graph.from");
-			ut64 to = rz_config_get_i(core->config, "graph.to");
-			RzListIter *it;
-			RzAnalysisFunction *fcn;
-			rz_list_foreach (core->analysis->fcns, it, fcn) {
-				if ((from == UT64_MAX && to == UT64_MAX) || RZ_BETWEEN(from, fcn->addr, to)) {
-					rz_core_analysis_coderefs(core, fcn->addr);
-				}
-			}
-			break;
-		}
-		default: {
-			core->graph->is_callgraph = true;
-			rz_core_agraph_reset(core);
-			rz_core_cmdf(core, ".agR*;");
-			rz_core_agraph_print(core, -1, input + 1);
-			core->graph->is_callgraph = false;
-			break;
-		}
-		}
-		break;
-	case 'x': { // "agx" cross refs
-		RzGraph *graph = rz_core_analysis_codexrefs(core, core->offset);
-		if (!graph) {
-			eprintf("Couldn't create graph");
-			break;
-		}
-		rz_core_graph_print(core, graph, -1, true, input + 1);
-		rz_graph_free(graph);
-		break;
-	}
-	case 'i': { // "agi" import graph
-		RzGraph *graph = rz_core_analysis_importxrefs(core);
-		if (!graph) {
-			eprintf("Couldn't create graph");
-			break;
-		}
-		rz_core_graph_print(core, graph, -1, true, input + 1);
-		rz_graph_free(graph);
-		break;
-	}
-	case 'c': // "agc"
-		switch (input[1]) {
-		case 'v': // "agcv"
-		case 't': // "agct"
-		case 'k': // "agck"
-		case 'w': // "agcw"
-		case ' ': { // "agc "
-			core->graph->is_callgraph = true;
-			rz_core_agraph_reset(core);
-			rz_core_cmdf(core, ".agc* @ %" PFMT64u "; agg%s;", core->offset, input + 1);
-			core->graph->is_callgraph = false;
-			break;
-		}
-		case 0: // "agc "
-			core->graph->is_callgraph = true;
-			rz_core_agraph_reset(core);
-			rz_core_cmd0(core, ".agc* $$");
-			rz_core_agraph_print_ascii(core);
-			core->graph->is_callgraph = false;
-			break;
-		case 'g': { // "agg"
-			rz_core_analysis_callgraph(core, core->offset, RZ_GRAPH_FORMAT_GMLFCN);
-			break;
-		}
-		case 'd': { // "aggd"
-			rz_core_analysis_callgraph(core, core->offset, RZ_GRAPH_FORMAT_DOT);
-			break;
-		}
-		case 'J': // "aggJ"
-		case 'j': { // "aggj"
-			rz_core_analysis_callgraph(core, core->offset, RZ_GRAPH_FORMAT_JSON);
-			break;
-		}
-		case '*': { // "agg*"
-			rz_core_analysis_callgraph(core, core->offset, RZ_GRAPH_FORMAT_CMD);
-			break;
-		}
-		default:
-			eprintf("Usage: see ag?\n");
-			break;
-		}
 		break;
 	case 'j': // "agj" alias for agfj
 		rz_core_cmdf(core, "agfj%s", input + 1);
@@ -3082,87 +2802,6 @@ static void cmd_analysis_graph(RzCore *core, const char *input) {
 	case 'l': // "agl"
 		rz_core_analysis_graph(core, rz_num_math(core->num, input + 1), RZ_CORE_ANALYSIS_GRAPHLINES);
 		break;
-	case 'a': // "aga"
-		switch (input[1]) {
-		case '*': {
-			rz_core_analysis_datarefs(core, core->offset);
-			break;
-		}
-		default:
-			rz_core_agraph_reset(core);
-			rz_core_cmdf(core, ".aga* @ %" PFMT64u ";", core->offset);
-			rz_core_agraph_print(core, -1, input + 1);
-			break;
-		}
-		break;
-	case 'A': // "agA" global data refs
-		switch (input[1]) {
-		case '*': {
-			ut64 from = rz_config_get_i(core->config, "graph.from");
-			ut64 to = rz_config_get_i(core->config, "graph.to");
-			RzListIter *it;
-			RzAnalysisFunction *fcn;
-			rz_list_foreach (core->analysis->fcns, it, fcn) {
-				if ((from == UT64_MAX && to == UT64_MAX) || RZ_BETWEEN(from, fcn->addr, to)) {
-					rz_core_analysis_datarefs(core, fcn->addr);
-				}
-			}
-			break;
-		}
-		default:
-			rz_core_agraph_reset(core);
-			rz_core_cmdf(core, ".agA*;");
-			rz_core_agraph_print(core, -1, input + 1);
-			break;
-		}
-		break;
-	case 'd': { // "agd"
-		int diff_opt = RZ_CORE_ANALYSIS_GRAPHBODY | RZ_CORE_ANALYSIS_GRAPHDIFF;
-		switch (input[1]) {
-		case 'j': { // "agdj"
-			ut64 addr = input[2] ? rz_num_math(core->num, input + 2) : core->offset;
-			rz_core_gdiff_function_1_file(core, addr, core->offset);
-			rz_core_analysis_graph(core, addr, diff_opt | RZ_CORE_ANALYSIS_JSON);
-			break;
-		}
-		case 'J': { // "agdJ"
-			ut64 addr = input[2] ? rz_num_math(core->num, input + 2) : core->offset;
-			rz_core_gdiff_function_1_file(core, addr, core->offset);
-			rz_core_analysis_graph(core, addr, diff_opt | RZ_CORE_ANALYSIS_JSON | RZ_CORE_ANALYSIS_JSON_FORMAT_DISASM);
-			break;
-		}
-		case '*': { // "agd*"
-			ut64 addr = input[2] ? rz_num_math(core->num, input + 2) : core->offset;
-			rz_core_gdiff_function_1_file(core, addr, core->offset);
-			rz_core_analysis_graph(core, addr, diff_opt | RZ_CORE_ANALYSIS_STAR);
-			break;
-		}
-		case ' ': // "agd "
-		case 0:
-		case 't': // "agdt"
-		case 'k': // "agdk"
-		case 'v': // "agdv"
-		case 'g': { // "agdg"
-			ut64 addr = input[2] ? rz_num_math(core->num, input + 2) : core->offset;
-			rz_core_agraph_reset(core);
-			rz_core_cmdf(core, ".agd* @ %" PFMT64u "; agg%s;", addr, input + 1);
-			break;
-		}
-		case 'd': { // "agdd"
-			ut64 addr = input[2] ? rz_num_math(core->num, input + 2) : core->offset;
-			rz_core_gdiff_function_1_file(core, addr, core->offset);
-			rz_core_analysis_graph(core, addr, diff_opt);
-			break;
-		}
-		case 'w': { // "agdw"
-			char *cmdargs = rz_str_newf("agdd 0x%" PFMT64x, core->offset);
-			convert_dotcmd_to_image(core, cmdargs, input + 2);
-			free(cmdargs);
-			break;
-		}
-		}
-		break;
-	}
 	case 'v': // "agv" alias for "agfv"
 		rz_core_cmdf(core, "agfv%s", input + 1);
 		break;
@@ -6150,6 +5789,366 @@ RZ_IPI RzCmdStatus rz_il_vm_status_handler(RzCore *core, int argc, const char **
 		// print variable or all variables
 		rz_core_analysis_il_vm_status(core, argc == 2 ? argv[1] : NULL, mode);
 	}
+	return RZ_CMD_STATUS_OK;
+}
+
+RZ_IPI RzCmdStatus rz_analysis_graph_dataref_handler(RzCore *core, int argc, const char **argv) {
+	char format = argc > 1 ? argv[1][0] : ' ';
+	if (format == '*') {
+		rz_core_analysis_datarefs(core, core->offset);
+	} else {
+		rz_core_agraph_reset(core);
+		rz_core_cmdf(core, ".aga* @ %" PFMT64u ";", core->offset);
+		rz_core_agraph_print(core, -1, format);
+	}
+	return RZ_CMD_STATUS_OK;
+}
+
+RZ_IPI RzCmdStatus rz_analysis_graph_dataref_global_handler(RzCore *core, int argc, const char **argv) {
+	char format = argc > 1 ? argv[1][0] : ' ';
+	if (format == '*') {
+		ut64 from = rz_config_get_i(core->config, "graph.from");
+		ut64 to = rz_config_get_i(core->config, "graph.to");
+		RzListIter *it;
+		RzAnalysisFunction *fcn;
+		rz_list_foreach (core->analysis->fcns, it, fcn) {
+			if ((from == UT64_MAX && to == UT64_MAX) || RZ_BETWEEN(from, fcn->addr, to)) {
+				rz_core_analysis_datarefs(core, fcn->addr);
+			}
+		}
+	} else {
+		rz_core_agraph_reset(core);
+		rz_core_cmdf(core, ".agA*;");
+		rz_core_agraph_print(core, -1, &format);
+	}
+	return RZ_CMD_STATUS_OK;
+}
+
+RZ_IPI RzCmdStatus rz_analysis_graph_callgraph_function_handler(RzCore *core, int argc, const char **argv) {
+	char format = argc > 1 ? argv[1][0] : ' ';
+	switch (format) {
+	case 'v':
+	case 't':
+	case 'k':
+	case 'w':
+	case ' ': {
+		core->graph->is_callgraph = true;
+		rz_core_agraph_reset(core);
+		// TODO: Use the API here
+		rz_core_cmdf(core, ".agc* @ %" PFMT64u "; agg%s;", core->offset, &format);
+		core->graph->is_callgraph = false;
+		break;
+	}
+	case 0:
+		// FIXME: WHY IT IS DIFFERENT FROM PREVIOUS ONE?
+		core->graph->is_callgraph = true;
+		rz_core_agraph_reset(core);
+		rz_core_cmd0(core, ".agc* $$");
+		rz_core_agraph_print_ascii(core);
+		core->graph->is_callgraph = false;
+		break;
+	case 'g':
+		rz_core_analysis_callgraph(core, core->offset, RZ_GRAPH_FORMAT_GMLFCN);
+		break;
+	case 'd':
+		rz_core_analysis_callgraph(core, core->offset, RZ_GRAPH_FORMAT_DOT);
+		break;
+	case 'J':
+	case 'j':
+		rz_core_analysis_callgraph(core, core->offset, RZ_GRAPH_FORMAT_JSON);
+		break;
+	case '*':
+		rz_core_analysis_callgraph(core, core->offset, RZ_GRAPH_FORMAT_CMD);
+		break;
+	default:
+		rz_warn_if_reached();
+		break;
+	}
+	return RZ_CMD_STATUS_OK;
+}
+
+RZ_IPI RzCmdStatus rz_analysis_graph_callgraph_global_handler(RzCore *core, int argc, const char **argv) {
+	char format = argc > 1 ? argv[1][0] : ' ';
+	switch (format) {
+	case 'v':
+	case 't':
+	case 'k':
+	case 'w':
+	case ' ':
+		core->graph->is_callgraph = true;
+		rz_core_agraph_reset(core);
+		rz_core_cmdf(core, ".agC*;");
+		rz_core_agraph_print(core, -1, input + 1);
+		core->graph->is_callgraph = false;
+		break;
+	case 'J':
+	case 'j':
+		rz_core_analysis_callgraph(core, UT64_MAX, RZ_GRAPH_FORMAT_JSON);
+		break;
+	case 'g':
+		rz_core_analysis_callgraph(core, UT64_MAX, RZ_GRAPH_FORMAT_GML);
+		break;
+	case 'd':
+		rz_core_analysis_callgraph(core, UT64_MAX, RZ_GRAPH_FORMAT_DOT);
+		break;
+	case '*':
+		rz_core_analysis_callgraph(core, UT64_MAX, RZ_GRAPH_FORMAT_CMD);
+		break;
+	default:
+		rz_warn_if_reached();
+		break;
+	}
+	return RZ_CMD_STATUS_OK;
+}
+
+RZ_IPI RzCmdStatus rz_analysis_graph_diff_handler(RzCore *core, int argc, const char **argv) {
+	int diff_opt = RZ_CORE_ANALYSIS_GRAPHBODY | RZ_CORE_ANALYSIS_GRAPHDIFF;
+	char format = argc > 1 ? argv[1][0] : ' ';
+	ut64 addr = argc > 2 ? rz_num_math(core->num, argv[2]) : core->offset;
+	switch (format) {
+	case 'j': {
+		rz_core_gdiff_function_1_file(core, addr, core->offset);
+		rz_core_analysis_graph(core, addr, diff_opt | RZ_CORE_ANALYSIS_JSON);
+		break;
+	}
+	case 'J': {
+		rz_core_gdiff_function_1_file(core, addr, core->offset);
+		rz_core_analysis_graph(core, addr, diff_opt | RZ_CORE_ANALYSIS_JSON | RZ_CORE_ANALYSIS_JSON_FORMAT_DISASM);
+		break;
+	}
+	case '*': {
+		rz_core_gdiff_function_1_file(core, addr, core->offset);
+		rz_core_analysis_graph(core, addr, diff_opt | RZ_CORE_ANALYSIS_STAR);
+		break;
+	}
+	case ' ':
+	case 't':
+	case 'k':
+	case 'v':
+	case 'g': {
+		rz_core_agraph_reset(core);
+		rz_core_cmdf(core, ".agd* @ %" PFMT64u "; agg%s;", addr, input + 1);
+		break;
+	}
+	case 'd': {
+		rz_core_gdiff_function_1_file(core, addr, core->offset);
+		rz_core_analysis_graph(core, addr, diff_opt);
+		break;
+	}
+	case 'w': {
+		char *cmdargs = rz_str_newf("agdd 0x%" PFMT64x, core->offset);
+		convert_dotcmd_to_image(core, cmdargs, input + 2);
+		free(cmdargs);
+		break;
+	}
+	default:
+		rz_warn_if_reached();
+		break;
+	}
+	return RZ_CMD_STATUS_OK;
+}
+
+RZ_IPI RzCmdStatus rz_analysis_graph_bb_function_handler(RzCore *core, int argc, const char **argv) {
+	char format = argc > 1 ? argv[1][0] : ' ';
+	switch (format) {
+	case 'v': {
+		eprintf("\rRendering graph...\n");
+		RzAnalysisFunction *fcn = rz_analysis_get_fcn_in(core->analysis, core->offset, RZ_ANALYSIS_FCN_TYPE_ROOT);
+		if (fcn) {
+			rz_core_visual_graph(core, NULL, fcn, 1);
+		}
+		rz_cons_enable_mouse(false);
+		rz_cons_show_cursor(true);
+		break;
+	}
+	case 't': {
+		int e = rz_config_get_i(core->config, "graph.edges");
+		rz_config_set_i(core->config, "graph.edges", 0);
+		RzAnalysisFunction *fcn = rz_analysis_get_fcn_in(core->analysis, core->offset, 0);
+		rz_core_visual_graph(core, NULL, fcn, 2);
+		rz_config_set_i(core->config, "graph.edges", e);
+		break;
+	}
+	case 'd':
+		if (input[2] == 'm') {
+			rz_core_analysis_graph(core, rz_num_math(core->num, input + 3),
+				RZ_CORE_ANALYSIS_GRAPHLINES);
+		} else {
+			rz_core_analysis_graph(core, rz_num_math(core->num, input + 2),
+				RZ_CORE_ANALYSIS_GRAPHBODY);
+		}
+		break;
+	case 'j':
+		rz_core_analysis_graph(core, rz_num_math(core->num, input + 2), RZ_CORE_ANALYSIS_JSON);
+		break;
+	case 'J': {
+		// Honor asm.graph=false in json as well
+		RzConfigHold *hc = rz_config_hold_new(core->config);
+		rz_config_hold_i(hc, "asm.offset", NULL);
+		const bool o_graph_offset = rz_config_get_i(core->config, "graph.offset");
+		rz_config_set_i(core->config, "asm.offset", o_graph_offset);
+		rz_core_analysis_graph(core, rz_num_math(core->num, input + 2),
+			RZ_CORE_ANALYSIS_JSON | RZ_CORE_ANALYSIS_JSON_FORMAT_DISASM);
+		rz_config_hold_restore(hc);
+		rz_config_hold_free(hc);
+		break;
+	}
+	case 'g': {
+		RzAnalysisFunction *fcn = rz_analysis_get_fcn_in(core->analysis, core->offset, 0);
+		rz_core_print_bb_gml(core, fcn);
+		break;
+	}
+	case 'k':
+		rz_core_agraph_reset(core);
+		// TODO: Use the API
+		rz_core_cmdf(core, ".agf* @ %" PFMT64u "", core->offset);
+		rz_core_agraph_print_sdb(core);
+		break;
+	case '*': {
+		RzAnalysisFunction *fcn = rz_analysis_get_fcn_in(core->analysis, core->offset, 0);
+		rz_core_print_bb_custom(core, fcn);
+		break;
+	}
+	case 'w': {
+		char *cmdargs = rz_str_newf("agfd @ 0x%" PFMT64x, core->offset);
+		convert_dotcmd_to_image(core, cmdargs, input + 2);
+		free(cmdargs);
+		break;
+	}
+	default:
+		rz_warn_if_reached();
+		break;
+	}
+
+	return RZ_CMD_STATUS_OK;
+}
+
+RZ_IPI RzCmdStatus rz_analysis_graph_imports_handler(RzCore *core, int argc, const char **argv) {
+	RzGraph *graph = rz_core_analysis_importxrefs(core);
+	if (!graph) {
+		RZ_LOG_ERROR("Couldn't create graph\n");
+		return RZ_CMD_STATUS_ERROR;
+	}
+	rz_core_graph_print(core, graph, -1, true, input + 1);
+	rz_graph_free(graph);
+	return RZ_CMD_STATUS_OK;
+}
+
+RZ_IPI RzCmdStatus rz_analysis_graph_refs_handler(RzCore *core, int argc, const char **argv) {
+	char format = argc > 2 ? argv[1][0] : ' ';
+	if (format == '*') {
+		rz_core_analysis_coderefs(core, core->offset);
+	} else {
+		core->graph->is_callgraph = true;
+		rz_core_agraph_reset(core);
+		rz_core_cmdf(core, ".agr* @ %" PFMT64u ";", core->offset);
+		rz_core_agraph_print(core, -1, input + 1);
+		core->graph->is_callgraph = false;
+	}
+	return RZ_CMD_STATUS_OK;
+}
+
+RZ_IPI RzCmdStatus rz_analysis_graph_refs_global_handler(RzCore *core, int argc, const char **argv) {
+	char format = argc > 2 ? argv[1][0] : ' ';
+	if (format == '*') {
+		ut64 from = rz_config_get_i(core->config, "graph.from");
+		ut64 to = rz_config_get_i(core->config, "graph.to");
+		RzListIter *it;
+		RzAnalysisFunction *fcn;
+		rz_list_foreach (core->analysis->fcns, it, fcn) {
+			if ((from == UT64_MAX && to == UT64_MAX) || RZ_BETWEEN(from, fcn->addr, to)) {
+				rz_core_analysis_coderefs(core, fcn->addr);
+			}
+		}
+	} else {
+		core->graph->is_callgraph = true;
+		rz_core_agraph_reset(core);
+		rz_core_cmdf(core, ".agR*;");
+		rz_core_agraph_print(core, -1, input + 1);
+		core->graph->is_callgraph = false;
+	}
+	return RZ_CMD_STATUS_OK;
+}
+
+RZ_IPI RzCmdStatus rz_analysis_graph_unknown_handler(RzCore *core, int argc, const char **argv) {
+	rz_core_analysis_graph(core, rz_num_math(core->num, argv[1]), 0);
+	return RZ_CMD_STATUS_OK;
+}
+
+RZ_IPI RzCmdStatus rz_analysis_graph_xrefs_handler(RzCore *core, int argc, const char **argv) {
+	RzGraph *graph = rz_core_analysis_codexrefs(core, core->offset);
+	if (!graph) {
+		RZ_LOG_ERROR("Couldn't create graph\n");
+		return RZ_CMD_STATUS_ERROR;
+	}
+	rz_core_graph_print(core, graph, -1, true, argv[1]);
+	rz_graph_free(graph);
+	return RZ_CMD_STATUS_OK;
+}
+
+RZ_IPI RzCmdStatus rz_analysis_graph_custom_handler(RzCore *core, int argc, const char **argv) {
+	char format = argc > 1 ? argv[1][0] : ' ';
+	switch (format) {
+	case 't':
+		rz_core_agraph_print_tiny(core);
+		break;
+	case 'k':
+		rz_core_agraph_print_sdb(core);
+		break;
+	case 'v':
+	case 'i':
+		rz_core_agraph_print_interactive(core);
+		break;
+	case 'd':
+		rz_core_agraph_print_dot(core);
+		break;
+	case '*':
+		rz_core_agraph_print_rizin(core);
+		break;
+	case 'J':
+	case 'j':
+		rz_core_agraph_print_json(core);
+		break;
+	case 'g':
+		rz_core_agraph_print_gml(core);
+		break;
+	case 'w':
+		if (argc < 3) {
+			RZ_LOG_ERROR("Writing graph to a file requires file path\n");
+			break;
+		}
+		rz_core_agraph_print_write(core, argv[2]);
+		break;
+	default:
+		rz_core_agraph_print_ascii(core);
+		break;
+	}
+	return RZ_CMD_STATUS_OK;
+}
+
+RZ_IPI RzCmdStatus rz_analysis_graph_custom_clear_handler(RzCore *core, int argc, const char **argv) {
+	rz_core_agraph_reset(core);
+	return RZ_CMD_STATUS_OK;
+}
+
+RZ_IPI RzCmdStatus rz_analysis_graph_custom_node_add_handler(RzCore *core, int argc, const char **argv) {
+	int color = argc > 3 ? rz_num_math(NULL, argv[3]) : -1;
+	rz_core_agraph_add_node(core, argv[1], argv[2], color);
+	return RZ_CMD_STATUS_OK;
+}
+
+RZ_IPI RzCmdStatus rz_analysis_graph_custom_node_remove_handler(RzCore *core, int argc, const char **argv) {
+	rz_core_agraph_del_node(core, argv[1]);
+	return RZ_CMD_STATUS_OK;
+}
+
+RZ_IPI RzCmdStatus rz_analysis_graph_custom_edge_add_handler(RzCore *core, int argc, const char **argv) {
+	rz_core_agraph_add_edge(core, argv[1], argv[2]);
+	return RZ_CMD_STATUS_OK;
+}
+
+RZ_IPI RzCmdStatus rz_analysis_graph_custom_edge_remove_handler(RzCore *core, int argc, const char **argv) {
+	rz_core_agraph_del_edge(core, argv[1], argv[2]);
 	return RZ_CMD_STATUS_OK;
 }
 

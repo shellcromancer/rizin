@@ -28,6 +28,8 @@
 #undef MUL
 #undef DIV
 #undef SDIV
+#undef MOD
+#undef SMOD
 #undef SHIFTL
 #undef SHIFTR
 #undef SHIFTL0

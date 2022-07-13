@@ -93,6 +93,7 @@ message('rizin lib version: ' + rizin_libversion)
 
 # system dependencies
 cc = meson.get_compiler('c')
+cc_native = meson.get_compiler('c', native: true)
 # required for linux
 ldl = cc.find_library('dl', required: false, static: is_static_build)
 th = dependency('threads', required: false, static: is_static_build)

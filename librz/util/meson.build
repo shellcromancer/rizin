@@ -115,9 +115,48 @@ rz_util_dep = declare_dependency(
 meson.override_dependency('rz_util', rz_util_dep)
 
 if meson.is_cross_build()
+  # this is a bit messy, it duplicates most of the code required to get the
+  # regular dependencies but for the build_system. This is required to build
+  # sdb_native, used at build time to compile .sdb.txt files into .sdb ones.
+  platform_native_deps = []
+  if build_machine.system() == 'windows'
+    platform_native_deps = [
+      cc_native.find_library('ws2_32'),
+      cc_native.find_library('wininet'),
+      cc_native.find_library('psapi'),
+    ]
+  endif
+  ldl_native = cc_native.find_library('dl', required: false, static: is_static_build)
+  lrt_native = disabler()
+  if not cc_native.has_function('clock_gettime', prefix: '#include <time.h>') and cc_native.has_header_symbol('features.h', '__GLIBC__')
+    lrt_native = cc_native.find_library('rt', required: true, static: is_static_build)
+  endif
+  have_lrt = not ['windows', 'darwin', 'openbsd', 'android', 'haiku'].contains(build_machine.system())
+  if have_lrt and not lrt_native.found()
+    lrt_native = cc_native.find_library('rt', required: true, static: is_static_build)
+  endif
+  if build_machine.system() == 'sunos'
+    # workaround for Solaris until https://github.com/mesonbuild/meson/issues/4328 is fixed
+    mth_native = declare_dependency(link_args: '-lm', native: true)
+  else
+    mth_native = cc_native.find_library('m', required: false, static: is_static_build)
+  endif
+  th_native = dependency('threads', required: false, static: is_static_build, native: true)
+  utl_native = cc_native.find_library('util', required: false, static: is_static_build)
+  zlib_dep_native = dependency('zlib', required: get_option('use_sys_zlib'), static: is_static_build, native: true)
+  liblzma_dep_native = disabler()
+  if get_option('use_lzma')
+    liblzma_dep_native = dependency('liblzma', required: get_option('use_sys_lzma'), static: is_static_build, native: true)
+  endif
+  rz_util_native_deps = [ldl_native, lrt_native, mth_native, th_native, utl_native, zlib_dep_native, liblzma_dep_native] + platform_native_deps
+  if ['freebsd', 'netbsd', 'haiku', 'dragonfly'].contains(build_machine.system())
+    # backtrace_symbols_fd requires -lexecinfo
+    rz_util_native_deps += [cc_native.find_library('execinfo', static: is_static_build)]
+  endif
+
   rz_util_native = static_library('rz_util_native', rz_util_sources, libsdb_sources,
     include_directories: rz_util_includes,
-    dependencies: rz_util_deps,
+    dependencies: rz_util_native_deps,
     implicit_include_directories: false,
     install_rpath: rpath_lib,
     install: false,
